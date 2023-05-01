@@ -1,10 +1,16 @@
-import React, {FC, useRef, useState} from 'react';
-import {Button, SearchBar} from '@rneui/themed';
+import React, {Dispatch, FC, useRef, useState} from 'react';
+import {SearchBar, SpeedDial} from '@rneui/themed';
 import {COLORS} from '../constants';
 import {Modal, StyleSheet, View} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import {AddFood} from './add-food';
-export const AddFAB: FC<{}> = ({}) => {
+import {AddFood} from './food-category-list';
+import {Mode} from '../screens/layer';
+export const AddFAB: FC<{
+  mode: Mode;
+  setMode: Dispatch<React.SetStateAction<Mode>>;
+  refresh: () => any;
+  showEdit: boolean;
+}> = ({mode, setMode, refresh, showEdit}) => {
   const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const handleCloseModal = () => {
@@ -14,9 +20,66 @@ export const AddFAB: FC<{}> = ({}) => {
     setSearch(value);
   };
   const ref = useRef<any>();
+  const [open, setOpen] = React.useState(false);
   return (
     <>
-      <View style={styles.buttonContainer}>
+      <SpeedDial
+        isOpen={open}
+        icon={{name: 'edit', color: '#fff'}}
+        openIcon={{name: 'close', color: '#fff'}}
+        onOpen={() => setOpen(!open)}
+        onClose={() => setOpen(!open)}
+        color={COLORS.background}>
+        <SpeedDial.Action
+          icon={<Icon name="add" color="white" size={20} />}
+          buttonStyle={{backgroundColor: 'rgb(40, 200, 64)'}}
+          title="Add"
+          onPress={() => {
+            setOpen(false);
+            setModalVisible(true);
+          }}
+        />
+        {showEdit ? (
+          <SpeedDial.Action
+            icon={<Icon name="delete-forever" color="white" size={20} />}
+            buttonStyle={{backgroundColor: 'rgb(255, 95, 87)'}}
+            title="Delete"
+            onPress={() => {
+              setOpen(false);
+              setMode('delete');
+            }}
+          />
+        ) : (
+          <></>
+        )}
+        {showEdit ? (
+          <SpeedDial.Action
+            icon={<Icon name="auto-delete" color="white" size={20} />}
+            buttonStyle={{backgroundColor: 'black'}}
+            title="Discard"
+            onPress={() => {
+              setOpen(false);
+              setMode('discard');
+            }}
+          />
+        ) : (
+          <></>
+        )}
+        {showEdit ? (
+          <SpeedDial.Action
+            icon={<Icon name="done-all" color="white" size={20} />}
+            buttonStyle={{backgroundColor: 'rgb(255, 189, 46)'}}
+            title="Exhausted"
+            onPress={() => {
+              setOpen(false);
+              setMode('exhausted');
+            }}
+          />
+        ) : (
+          <></>
+        )}
+      </SpeedDial>
+      {/* <View style={styles.buttonContainer}>
         <Button
           icon={<Icon name="add" size={30} color="white" />}
           buttonStyle={styles.button}
@@ -25,7 +88,7 @@ export const AddFAB: FC<{}> = ({}) => {
             setModalVisible(true);
           }}
         />
-      </View>
+      </View> */}
       <Modal
         visible={modalVisible}
         animationType="slide"

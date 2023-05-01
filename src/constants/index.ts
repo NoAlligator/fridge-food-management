@@ -18,3 +18,11 @@ export const AsyncStorageKeys = {
   expirationNotificationTime: 'EXPIRATION_NOTIFICATION_TIME',
   expirationNotificationFreq: 'EXPIRATION_NOTIFICATION_FREQ',
 };
+
+export const LayerCopy = {
+  Fresh: 'Crisper layer',
+  Frozen: 'Freezer layer',
+  Normal: 'Pantry',
+};
+
+export const CHANNEL_ID = 'fridge-notification';

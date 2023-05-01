@@ -1,11 +1,11 @@
 import * as React from 'react';
 import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs';
-import {FrozenLayer} from '../screens/frozen-layer';
-import {FreshLayer} from '../screens/fresh-layer';
-import {NormalLayer} from '../screens/normal-temperature-layer';
+import {LayerScreen} from '../screens/layer';
 import {COLORS} from '../constants';
 import {StyleSheet, Text} from 'react-native';
-import {FC} from 'react';
+import {FC, useCallback, useMemo, useState} from 'react';
+import {Layer} from '../types';
+import {LayerUpdaterContext} from '../store';
 const Tab = createMaterialTopTabNavigator();
 
 const fontStyle = StyleSheet.create({
@@ -17,16 +17,47 @@ const CustomLabel: FC<{label: string}> = ({label}) => (
 );
 
 const Labels = {
-  freezing: () => <CustomLabel label="Freezing" />,
-  refrigeration: () => <CustomLabel label="Refrigeration" />,
+  refrigeration: () => <CustomLabel label="Fresh" />,
+  freezing: () => <CustomLabel label="Frozen" />,
   pantry: () => <CustomLabel label="Pantry" />,
 };
 
+const DEFAULT_ROUTE = 'Fresh';
+
+// const FreshLayer = () => <LayerScreen layer={'Fresh'} />;
+// const FrozenLayer = () => <LayerScreen layer={'Frozen'} />;
+// const NormalLayer = () => <LayerScreen layer={'Normal'} />;
+
+const useTriggerLayer = (layer: Layer) => {
+  const [update, setUpdate] = useState({});
+  const trigger = () => setUpdate({});
+  const FreshLayer = useCallback(
+    () => <LayerScreen layer={layer} />,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [update, layer],
+  );
+  return [FreshLayer as any, trigger];
+};
+
 export default function Tabs() {
+  // const FreshLayer = useCallback(() => <LayerScreen layer={'Fresh'} />, []);
+  // const FrozenLayer = useCallback(() => <LayerScreen layer={'Frozen'} />, []);
+  // const NormalLayer = useCallback(() => <LayerScreen layer={'Normal'} />, []);
+  const [FreshLayer, Fresh] = useTriggerLayer('Fresh');
+  const [FrozenLayer, Frozen] = useTriggerLayer('Frozen');
+  const [NormalLayer, Normal] = useTriggerLayer('Normal');
+  const updaters = useMemo<Record<Layer, () => any>>(
+    () => ({
+      Fresh,
+      Normal,
+      Frozen,
+    }),
+    [Fresh, Normal, Frozen],
+  );
   return (
-    <>
+    <LayerUpdaterContext.Provider value={updaters}>
       <Tab.Navigator
-        initialRouteName="Fresh"
+        initialRouteName={DEFAULT_ROUTE}
         sceneContainerStyle={{backgroundColor: COLORS.background}}
         style={{
           backgroundColor: COLORS.background,
@@ -67,6 +98,6 @@ export default function Tabs() {
           }}
         />
       </Tab.Navigator>
-    </>
+    </LayerUpdaterContext.Provider>
   );
 }

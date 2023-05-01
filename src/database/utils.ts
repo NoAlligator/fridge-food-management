@@ -21,21 +21,47 @@ export const getDBConnection = (dbName = DEFAULT_DATABASE_NAME) => {
   );
 };
 
+// 删除数据表
+export const deleteTable = (
+  db: SQLiteDatabase,
+  tableName: string,
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `DROP TABLE IF EXISTS ${tableName};`,
+        [],
+        () => {
+          console.log(`删除 ${tableName} 成功`);
+          resolve();
+        },
+        error => {
+          console.log(
+            `Error while deleting table ${tableName}: ${error.message}`,
+          );
+          reject(error);
+        },
+      );
+    });
+  });
+};
+
 // 创建数据表
 export const initTable = async (
   db: SQLiteDatabase,
   tableName: string,
+  sql: string,
 ): Promise<void> => {
   return new Promise((resolve, reject) => {
     // 在事务中执行表的初始化操作
     db.transaction(tx => {
       // 执行创建表的 SQL 语句
       tx.executeSql(
-        `CREATE TABLE IF NOT EXISTS ${tableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)`,
+        sql,
         [],
         () => {
           // 初始化成功，调用 resolve() 方法
-          console.log('初始化数据表成功');
+          console.log(`初始化数据表${tableName}成功`);
           resolve();
         },
         (_, error) => {
@@ -47,6 +73,30 @@ export const initTable = async (
     });
   });
 };
+
+// 清空数据表
+export function clearTable(db: SQLiteDatabase, tableName: string) {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `DELETE FROM ${tableName};`,
+        [],
+        (_, result) => {
+          console.log(
+            `Table ${tableName} cleared successfully.`,
+            'Result',
+            result,
+          );
+          resolve(true);
+        },
+        (_, error) => {
+          console.log(`Error clearing table ${tableName}:`, error);
+          reject(error);
+        },
+      );
+    });
+  });
+}
 
 // 插入一条或多条数据
 export const insertDataToTable = async (
@@ -149,4 +199,148 @@ export const fetchFieldNamesFromTable = (
       );
     });
   });
+};
+
+// 基于条件的查询
+export const queryByCondition = async (
+  db: SQLiteDatabase,
+  tableName: string,
+  filterObj: Record<string, any>,
+) => {
+  // 构建SQL查询语句
+  let query = `SELECT * FROM ${tableName}`;
+  const filters = Object.keys(filterObj);
+  if (filters.length > 0) {
+    query += ' WHERE ';
+    filters.forEach((filter, index) => {
+      query += `${filter} = "${filterObj[filter]}"`;
+      if (index < filters.length - 1) {
+        query += ' AND ';
+      }
+    });
+  }
+  // 执行查询语句
+  const data = await new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        query,
+        [],
+        (_, results) => {
+          resolve(results);
+        },
+        error => {
+          console.log('ERROR: ', error);
+          reject(error);
+        },
+      );
+    });
+  });
+  return convertResultToArray(data as ResultSet);
+};
+
+export const queryByKeyword = async (
+  db: SQLiteDatabase,
+  tableName: string,
+  fieldName: string,
+  fieldValue: string,
+) => {
+  // 构建SQL查询语句
+  const query = `SELECT * FROM ${tableName} WHERE ${fieldName} LIKE '%${fieldValue}%'`;
+
+  // 执行查询语句
+  const data = await new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        query,
+        [],
+        (_, results) => {
+          resolve(results);
+        },
+        error => {
+          console.log('ERROR: ', error);
+          reject(error);
+        },
+      );
+    });
+  });
+  return convertResultToArray(data as ResultSet);
+};
+
+// 删除数据
+export const deleteDataByIds = (
+  db: SQLiteDatabase,
+  tableName: string,
+  ids: number[],
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // 构建 SQL 语句
+      const sql = `DELETE FROM ${tableName} WHERE id IN (${ids.join(',')})`;
+      // 执行 SQL 语句
+      tx.executeSql(
+        sql,
+        [],
+        (_, result) => {
+          console.log(`删除 ${tableName} 表中的数据成功！`, result);
+          resolve();
+        },
+        error => {
+          console.log(`删除 ${tableName} 表中的数据失败！`, error);
+          reject(error);
+        },
+      );
+    });
+  });
+};
+
+// 根据ID删除数据
+export function deleteDataById(
+  db: SQLiteDatabase,
+  tableName: string,
+  id: number,
+) {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `DELETE FROM ${tableName} WHERE id = ?;`,
+        [id],
+        (tx, resultSet) => {
+          resolve(resultSet);
+        },
+        (tx, error) => {
+          reject(error);
+        },
+      );
+    });
+  });
+}
+
+// 根据ID更新数据
+interface DataToUpdate {
+  [key: string]: any; // 定义对象任意属性类型
+}
+
+export const updateDataById = async (
+  db: SQLiteDatabase,
+  tableName: string,
+  id: number,
+  dataToUpdate: DataToUpdate,
+): Promise<boolean> => {
+  try {
+    const fieldsToUpdate = Object.keys(dataToUpdate);
+    const valuesToUpdate = Object.values(dataToUpdate);
+
+    const query = `
+      UPDATE ${tableName}
+      SET ${fieldsToUpdate.map(field => `${field}=?`).join(', ')}
+      WHERE id=?
+    `;
+
+    await db.executeSql(query, [...valuesToUpdate, id]);
+
+    return true;
+  } catch (error) {
+    console.error('Failed to update data:', error);
+    return false;
+  }
 };

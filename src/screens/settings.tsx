@@ -6,7 +6,7 @@ import {Divider, ListItem, Switch} from '@rneui/themed';
 import useAsyncStorage from '../hooks/useAsyncStorage';
 import {useNavigation} from '@react-navigation/native';
 import DropDownPicker from 'react-native-dropdown-picker';
-
+import NumericInput from 'react-native-numeric-input';
 const style = StyleSheet.create({
   headerContainer: {
     height: 50,
@@ -49,16 +49,16 @@ function TimeSelect() {
 function FrequencySelect() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([
-    {label: '12 hours', value: '12H'},
-    {label: '6 hours', value: '6H'},
-    {label: '3 hours', value: '3H'},
-    {label: '2 hours', value: '2H'},
-    {label: '1 hours', value: '1H'},
+    {label: '12 hours', value: '12'},
+    {label: '6 hours', value: '6'},
+    {label: '3 hours', value: '3'},
+    {label: '2 hours', value: '2'},
+    {label: '1 hours', value: '1'},
   ]);
 
   const [value, setStoredValue] = useAsyncStorage(
     AsyncStorageKeys.expirationNotificationFreq,
-    '6H',
+    6,
   );
 
   return (
@@ -86,7 +86,7 @@ function DailyTimeSelect() {
 
   const [value, setStoredValue] = useAsyncStorage(
     AsyncStorageKeys.dailyNotificationTime,
-    '1',
+    1,
   );
 
   return (
@@ -105,6 +105,15 @@ function DailyTimeSelect() {
 
 function RNEListItemAccordion() {
   const [expanded, setExpanded] = React.useState(false);
+  const [nearDays, setNearDays] = useAsyncStorage(
+    AsyncStorageKeys.expirationNotificationTime,
+    7,
+  );
+  const [freq, setFreq] = useAsyncStorage(
+    AsyncStorageKeys.expirationNotificationFreq,
+    12,
+  );
+
   return (
     <View style={{zIndex: 9000}}>
       <ListItem.Accordion
@@ -131,11 +140,16 @@ function RNEListItemAccordion() {
           <ListItem>
             <ListItem.Content>
               <ListItem.Title style={{marginLeft: 20}}>
-                Default Alert Time
+                Default Near Expiration Date
               </ListItem.Title>
             </ListItem.Content>
             <View>
-              <TimeSelect />
+              <NumericInput
+                value={nearDays}
+                onChange={v => setNearDays(Number(v))}
+                minValue={0}
+              />
+              {/* <TimeSelect /> */}
             </View>
           </ListItem>
         </View>
@@ -143,11 +157,12 @@ function RNEListItemAccordion() {
           <ListItem>
             <ListItem.Content>
               <ListItem.Title style={{marginLeft: 20}}>
-                Default Alert frequency
+                Default Alert Frequency(hours)
               </ListItem.Title>
             </ListItem.Content>
             <View>
-              <FrequencySelect />
+              {/* <FrequencySelect /> */}
+              <NumericInput value={freq} onChange={setFreq} minValue={3} />
             </View>
           </ListItem>
         </View>
@@ -212,7 +227,7 @@ export const Setting = () => {
             asyncKey={AsyncStorageKeys.exhaustedNotification}
           />
           <Divider />
-          <View style={{zIndex: 0}}>
+          {/* <View style={{zIndex: 0}}>
             <SwitchList
               title="Daily Expiration Reminder"
               subTitle="Remind you at a regular time each day of what foods will expire"
@@ -233,7 +248,7 @@ export const Setting = () => {
             </ListItem>
           </View>
           <Divider />
-          <View style={{height: 200}} />
+          <View style={{height: 200}} /> */}
         </ScrollView>
       </View>
     </View>

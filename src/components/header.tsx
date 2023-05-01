@@ -115,10 +115,8 @@ export const Header = () => {
                 <TouchableOpacity
                   onPress={() => {
                     setOpen(false);
-                    setTimeout(() => {
-                      // @ts-ignore
-                      navigation.navigate('Setting');
-                    });
+                    // @ts-ignore
+                    navigation.navigate('Setting');
                   }}>
                   <View style={headerStyle.moreOption}>
                     <Text style={{color: 'black'}}>Setting</Text>
