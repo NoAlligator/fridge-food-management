@@ -1,11 +1,15 @@
-import React, {FC, useState} from 'react';
+/* eslint-disable react-native/no-inline-styles */
+import React, {FC, useCallback, useContext, useEffect, useState} from 'react';
 import {Text, View} from 'react-native';
 import {Button, Divider} from '@rneui/themed';
 import {COLORS} from '../constants';
-import List from './alphabet-flat-list';
+import CustomAlphabetList from './alphabet-flat-list';
 import {useAsyncEffect} from 'ahooks';
 import {getAllCategories} from '../database/query';
 import {FoodCategory} from '../types';
+import {ShoppingModeContext, emitter} from '../store';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import {Pressable} from '@react-native-material/core';
 const CategoryButton: FC<{
   name: string;
   activeId: number | null;
@@ -34,19 +38,29 @@ const CategoryButton: FC<{
   );
 };
 
-export const AddFood: FC<{
+export const AddFoodCategoriesAndList: FC<{
   filterText: string;
 }> = ({filterText}) => {
   const inSearch = filterText !== '';
   const [activeCategoryId, setActiveCategoryId] = useState<null | number>(null);
   const [categories, setCategories] = useState<FoodCategory[]>([]);
   useAsyncEffect(async () => {
-    const data = await getAllCategories();
-    setCategories(data as any);
+    await refresh();
   }, []);
+  const refresh = useCallback(async () => {
+    const data = await getAllCategories();
+    console.log('refresh', data);
+    setCategories(data as any);
+    if (data.length) {
+      setActiveCategoryId(data[0].id);
+    }
+  }, []);
+
+  const [folded, setFolded] = useState(false);
+
   return (
     <View style={{display: 'flex', height: '100%', flex: 1}}>
-      {!inSearch && (
+      {!inSearch && !folded && (
         <>
           <View
             style={{
@@ -69,7 +83,28 @@ export const AddFood: FC<{
           <Divider style={{margin: 5}} />
         </>
       )}
-      <List activeCategoryId={activeCategoryId} filterText={filterText} />
+      {!inSearch && (
+        <Pressable
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'center',
+            paddingVertical: 10,
+          }}
+          onPress={() => {
+            setFolded(!folded);
+          }}>
+          {folded ? (
+            <Icon name="arrow-collapse-down" />
+          ) : (
+            <Icon name="arrow-collapse-up" />
+          )}
+        </Pressable>
+      )}
+      <CustomAlphabetList
+        activeCategoryId={activeCategoryId}
+        filterText={filterText}
+      />
     </View>
   );
 };

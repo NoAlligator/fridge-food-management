@@ -1,19 +1,26 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, {FC, useState} from 'react';
+import React, {FC, useCallback, useEffect, useState, useMemo} from 'react';
 import {ScrollView, View} from 'react-native';
 import {AddFAB} from '../components/add-main-page';
-import {LayerContext, RefreshContext} from '../store';
+import {RefreshContext, emitter} from '../store';
 import {useAsyncEffect} from 'ahooks';
-import {Layer, StockFood} from '../types';
+import {Layer, ShopListItem, StockFood} from '../types';
 import {FoodList} from '../components/food-list';
 import {
   TerminateType,
   getFoodInStockByLayer,
+  getFoodTotalAmount,
   handleTerminateSingleFood,
 } from '../database/query';
 import {FAB} from '@rneui/themed';
 import {db} from '../database';
-import {deleteDataByIds} from '../database/utils';
+import {
+  deleteDataByIds,
+  getAllDataFromTable,
+  getAllDataFromTableParsed,
+  queryByCondition,
+  updateDataById,
+} from '../database/utils';
 
 export type Mode = 'display' | 'delete' | 'exhausted' | 'discard';
 
@@ -23,12 +30,66 @@ export const LayerScreen: FC<{layer: Layer}> = ({layer}) => {
     const value = await getFoodInStockByLayer(layer);
     setData(value as any);
   }, []);
-  const refresh = async () => {
+  const dataMap = useMemo<Map<number, number>>(
+    () => new Map(data.map(({id, food_id}) => [id, food_id])),
+    [data],
+  );
+  const refresh = useCallback(async () => {
     const value = await getFoodInStockByLayer(layer);
     setData(value as any);
-  };
+  }, [layer]);
+  useEffect(() => {
+    emitter.on('Home/refresh', refresh);
+    return () => {
+      emitter.off('Home/refresh', refresh);
+    };
+  }, [refresh]);
   const [mode, setMode] = useState<Mode>('display');
   const [selected, setSelected] = useState<number[]>([]);
+  useAsyncEffect(async () => {
+    const data = await getAllDataFromTableParsed(db, 'shopping_list_foods');
+    const _data = await queryByCondition(db, 'shopping_list_foods', {
+      food_id: 63,
+      auto: 1,
+    });
+    console.log('_data', _data);
+    // console.log(
+    //   "await getAllDataFromTableParsed(db, 'shopping_list_foods')",
+    //   data,
+    // );
+  }, []);
+
+  // 必须在操作数据库之后执行
+  const autoListUpdater = useCallback(
+    async (ids: number[]) => {
+      return await Promise.all(
+        ids.map(async stock_id => {
+          const food_id = dataMap.get(stock_id);
+          // 获取是否有自动计划
+          const _data = await queryByCondition(db, 'shopping_list_foods', {
+            food_id,
+            auto: 1,
+          });
+          if (_data.length) {
+            const {auto_min_amount, auto_exp_amount, id} =
+              _data[0] as ShopListItem;
+            // 获取剩余总数
+            const retAmount = await getFoodTotalAmount(food_id as number);
+            // 剩余低于警戒线
+            if (retAmount < (auto_min_amount as number)) {
+              const amountToAdd = (auto_exp_amount as number) - retAmount;
+              updateDataById(db, 'shopping_list_foods', id, {
+                amount: amountToAdd,
+                checked: 0,
+              });
+            }
+          }
+        }),
+      );
+    },
+    [dataMap],
+  );
+
   const deleteSelected = async () => {
     if (!selected.length) {
       return setMode('display');
@@ -36,6 +97,7 @@ export const LayerScreen: FC<{layer: Layer}> = ({layer}) => {
       try {
         setMode('display');
         await deleteDataByIds(db, 'food_stocks', selected);
+        await autoListUpdater(selected);
         setSelected([]);
       } catch (e) {}
     }
@@ -46,6 +108,7 @@ export const LayerScreen: FC<{layer: Layer}> = ({layer}) => {
     await Promise.all(
       selected.map(id => handleTerminateSingleFood(id, TerminateType.USED)),
     );
+    await autoListUpdater(selected);
     await refresh();
   };
 
@@ -55,11 +118,12 @@ export const LayerScreen: FC<{layer: Layer}> = ({layer}) => {
     await Promise.all(
       selected.map(id => handleTerminateSingleFood(id, TerminateType.WASTED)),
     );
+    await autoListUpdater(selected);
     await refresh();
   };
   return (
-    <RefreshContext.Provider value={refresh}>
-      <LayerContext.Provider value={layer}>
+    <>
+      <RefreshContext.Provider value={refresh}>
         <View
           style={{
             flex: 1,
@@ -71,6 +135,7 @@ export const LayerScreen: FC<{layer: Layer}> = ({layer}) => {
           }}>
           <ScrollView style={{flex: 1}}>
             <FoodList
+              autoListUpdater={autoListUpdater}
               data={data}
               selected={selected}
               setSelected={setSelected}
@@ -122,6 +187,7 @@ export const LayerScreen: FC<{layer: Layer}> = ({layer}) => {
               setMode={setMode}
               refresh={refresh}
               showEdit={data.length > 0}
+              layer={layer}
             />
           ) : (
             <FAB
@@ -136,7 +202,7 @@ export const LayerScreen: FC<{layer: Layer}> = ({layer}) => {
             />
           )}
         </View>
-      </LayerContext.Provider>
-    </RefreshContext.Provider>
+      </RefreshContext.Provider>
+    </>
   );
 };

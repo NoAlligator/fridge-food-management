@@ -344,3 +344,55 @@ export const updateDataById = async (
     return false;
   }
 };
+
+export async function sumFieldById(
+  db: SQLiteDatabase,
+  tableName: string,
+  idField: string,
+  id: number,
+  aggregationfield: string,
+  retField = 'sum_field',
+) {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT SUM(${aggregationfield}) AS ${retField} FROM ${tableName} WHERE ${idField} = ?`,
+        [id],
+        (_, result) => {
+          resolve(convertResultToArray(result));
+        },
+        (_, error) => {
+          reject(error);
+        },
+      );
+    });
+  });
+}
+
+export enum Order {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
+// 读取并排序数据
+export async function readAndSortData(
+  db: SQLiteDatabase,
+  tableName: string,
+  sortField: string,
+  order: Order,
+) {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM ${tableName} ORDER BY ${sortField} ${order}`,
+        [],
+        (_, results) => {
+          resolve(convertResultToArray(results));
+        },
+        error => {
+          reject(error);
+        },
+      );
+    });
+  });
+}

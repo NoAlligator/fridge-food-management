@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unstable-nested-components */
 /* eslint-disable react-native/no-inline-styles */
 import React, {Dispatch, useMemo} from 'react';
 import {FC, useContext, useState} from 'react';
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {emitter} from '../store/index';
 import {Button, Card, Divider} from '@rneui/themed';
 import {LayerContext, LayerUpdaterContext, RefreshContext} from '../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -21,63 +23,13 @@ import {AsyncStorageKeys, CHANNEL_ID, COLORS} from '../constants';
 import useAsyncStorage from '../hooks/useAsyncStorage';
 import {StockFood} from '../types';
 import 'react-native-get-random-values';
-import {v4 as uuidv4} from 'uuid';
 import NumericInput from 'react-native-numeric-input';
 import PushNotification from 'react-native-push-notification';
 import {insertDataToTable} from '../database/utils';
 import {db} from '../database';
 import {useNavigation} from '@react-navigation/native';
 import {getExpirationStatus} from '../utils';
-
-type Without<T, K> = Pick<T, Exclude<keyof T, K>>;
-
-function TimeSelect({value, setStoredValue}: any) {
-  const [open, setOpen] = useState(false);
-  const [items, setItems] = useState([
-    {label: 'Expiry date', value: '0'},
-    {label: '1 days early', value: '1'},
-    {label: '2 days early', value: '2'},
-    {label: '3 days early', value: '3'},
-  ]);
-
-  return (
-    <DropDownPicker
-      style={{width: 150}}
-      open={open}
-      value={value}
-      items={items as any}
-      setOpen={setOpen}
-      onChangeValue={v => setStoredValue(v as any)}
-      setValue={setStoredValue as any}
-      setItems={setItems}
-    />
-  );
-}
-
-function FrequencySelect({value, setStoredValue}: any) {
-  const [open, setOpen] = useState(false);
-  const [items, setItems] = useState([
-    {label: '24 hours', value: '24'},
-    {label: '12 hours', value: '12'},
-    {label: '6 hours', value: '6'},
-    {label: '3 hours', value: '3'},
-    {label: '2 hours', value: '2'},
-    {label: '1 hours', value: '1'},
-  ]);
-
-  return (
-    <DropDownPicker
-      style={{width: 150}}
-      open={open}
-      value={value}
-      items={items as any}
-      setOpen={setOpen}
-      setValue={setStoredValue as any}
-      setItems={setItems}
-      onChangeValue={v => setStoredValue(v as any)}
-    />
-  );
-}
+import {Picker} from '@react-native-picker/picker';
 
 export const ItemAdd: FC<{
   categoryId: number;
@@ -85,17 +37,22 @@ export const ItemAdd: FC<{
   itemName: string;
   itemId: number;
   defaultLifeSpan: number | null;
-  setVisible: Dispatch<React.SetStateAction<boolean>>;
+  multiplyMode: boolean;
+  multiplyData?: {
+    amount: number;
+    addedCallback: (num: number) => any;
+  };
 }> = ({
   itemId,
-  categoryName,
   itemName,
-  defaultLifeSpan,
   categoryId,
-  setVisible: setModalVisible,
+  categoryName,
+  defaultLifeSpan,
+  multiplyMode = false,
+  multiplyData,
 }) => {
   // 数量
-  const [num, setNum] = useState(1);
+  const [num, setNum] = useState(multiplyMode ? multiplyData?.amount ?? 1 : 1);
   // 提前通知时间
   const [ent] = useAsyncStorage(AsyncStorageKeys.expirationNotificationTime, 7);
   const [entValue, setEntValue] = useState(ent);
@@ -163,20 +120,17 @@ export const ItemAdd: FC<{
   // Unit
   const [unit, setUnit] = useFoodItem(itemId, 'food_unit');
 
-  // Food name
-  const [foodName, setFoodName] = useState(itemName);
-
   // Layer
-  const [layerOpen, setLayerOpen] = useState(false);
   const layer = useContext(LayerContext);
   const [realLayer, setLayer] = useState(layer);
-  const [items, setItems] = useState([
+  const [items] = useState([
     {label: 'Crisper layer', value: 'Fresh'},
     {label: 'Freezer layer', value: 'Frozen'},
     {label: 'Pantry', value: 'Normal'},
   ]);
+  const navigation = useNavigation();
 
-  const ret: Without<Without<StockFood, 'id'>, 'notify_ids'> = {
+  const ret: Partial<StockFood> = {
     name: itemName,
     food_id: itemId,
     category_id: categoryId,
@@ -189,9 +143,6 @@ export const ItemAdd: FC<{
     end_time: +endTime,
     amount: num,
   };
-
-  const refresh = useContext(RefreshContext);
-  const updaters = useContext(LayerUpdaterContext);
   const [loading, setLoading] = useState(false);
 
   const handlePress = async () => {
@@ -221,13 +172,18 @@ export const ItemAdd: FC<{
 
     const ids = notificationTimes.map(() => generateUniqueId());
     const idsStr = JSON.stringify(ids);
-    const dataToStore: Without<StockFood, 'id'> = {
+    const dataToStore: Partial<StockFood> = {
       ...ret,
       notify_ids: idsStr,
-      used_amount_before_expiry: 0,
     };
     try {
       await insertDataToTable(db, 'food_stocks', dataToStore as any);
+      // @ts-ignore
+      emitter.emit('Home/refresh');
+      if (!multiplyMode) {
+        // @ts-ignore
+        navigation.navigate('Home');
+      }
       notificationTimes.forEach((date, index) => {
         const duration = moment.duration(moment(endTime).diff(date));
         const days = Math.floor(duration.asDays());
@@ -240,16 +196,13 @@ export const ItemAdd: FC<{
           channelId: CHANNEL_ID,
           id: ids[index],
           title: 'Food Expiration Reminder',
-          message: `Note that your ${itemId} ${display}. Please eat it as soon as possible to avoid wasting it`,
+          message: `Note that your ${itemName} ${display}. Please eat it as soon as possible to avoid wasting it`,
           date: date.toDate(),
           allowWhileIdle: false,
         });
       });
-      setModalVisible(false);
-      if (realLayer !== layer) {
-        updaters[realLayer]();
-      } else {
-        await refresh();
+      if (multiplyMode) {
+        await multiplyData?.addedCallback(num);
       }
     } catch (e) {
       console.log(e);
@@ -281,16 +234,8 @@ export const ItemAdd: FC<{
               justifyContent: 'center',
             }}>
             <Text style={{color: COLORS.background, fontSize: 30}}>
-              {foodName}
+              {itemName}
             </Text>
-            {/* <Text style={{color: 'black', fontSize: 18}}> Add Food: </Text>
-            <TextInput
-              style={{color: 'black', fontSize: 18}}
-              placeholder="Input name"
-              placeholderTextColor="#888"
-              value={foodName}
-              onChangeText={v => setFoodName(v)}
-            /> */}
           </View>
         </Card.Title>
         <Card.Divider />
@@ -315,18 +260,14 @@ export const ItemAdd: FC<{
               style={{marginRight: 5}}
               color="black"
             />
-            <Text style={styles.listTitle}>Storage Location</Text>
+            <Text style={styles.listTitle}>Location</Text>
           </View>
           <View style={{width: 150}}>
-            <DropDownPicker
-              open={layerOpen}
-              value={realLayer}
-              items={items as any}
-              setOpen={setLayerOpen}
-              onChangeValue={v => setLayer(v as any)}
-              setValue={setLayer as any}
-              setItems={setItems}
-            />
+            <Picker selectedValue={realLayer as any} onValueChange={setLayer}>
+              {items.map(({label, value}) => (
+                <Picker.Item label={label} value={value} key={value} />
+              ))}
+            </Picker>
           </View>
         </View>
         <Divider />
@@ -381,13 +322,6 @@ export const ItemAdd: FC<{
             <Text style={styles.listTitle}>Near Expiration Date</Text>
           </View>
           <View>
-            {/* <TimeSelect value={entValue} setStoredValue={setEntValue} /> */}
-            {/* <NumericInput
-              value={entValue}
-              onChange={setEntValue}
-              minValue={0}
-              maxValue={lifeSpan}
-            /> */}
             <ENT value={entValue} />
           </View>
         </View>
@@ -400,10 +334,9 @@ export const ItemAdd: FC<{
               style={{marginRight: 5}}
               color="black"
             />
-            <Text style={styles.listTitle}>Repeat Frequency</Text>
+            <Text style={styles.listTitle}>Reminder Frequency</Text>
           </View>
           <View>
-            {/* <FrequencySelect value={freqValue} setStoredValue={setFreqValue} /> */}
             <NumericInput
               value={freqValue}
               onChange={v => setFreqValue(Number(v))}
@@ -433,13 +366,6 @@ export const ItemAdd: FC<{
               }}
               minValue={1}
             />
-            {/* <TextInput
-              style={{color: 'black', fontSize: 18}}
-              placeholder="Input number"
-              placeholderTextColor="#888"
-              value={lifeSpan}
-              onChangeText={v => changeLifeSpan(v)}
-            /> */}
           </View>
         </View>
         <Divider />
@@ -518,16 +444,33 @@ export const ItemAdd: FC<{
           </Button>
         </View>
         <View style={{marginTop: 20}}>
-          <Button
-            buttonStyle={{
-              borderColor: COLORS.background,
-            }}
-            titleStyle={{
-              color: COLORS.background,
-            }}
-            type="outline">
-            Save As Preset
-          </Button>
+          {!multiplyMode ? (
+            <Button
+              buttonStyle={{
+                borderColor: COLORS.background,
+              }}
+              titleStyle={{
+                color: COLORS.background,
+              }}
+              type="outline"
+              onPress={() => {
+                // @ts-ignore
+                navigation.navigate('Preset', {
+                  item: {
+                    id: itemId,
+                    name: itemName,
+                    category_id: categoryId,
+                    category_name: categoryName,
+                    layer,
+                  },
+                  lifeSpan,
+                });
+              }}>
+              Save As Preset
+            </Button>
+          ) : (
+            <Divider />
+          )}
         </View>
       </View>
     </View>

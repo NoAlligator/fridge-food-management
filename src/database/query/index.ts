@@ -1,18 +1,49 @@
 import PushNotification from 'react-native-push-notification';
-import {ExhaustedFood, Layer, StockFood} from '../../types';
+import {Layer, StockFood} from '../../types';
 import {db} from '../index';
 import {
+  Order,
   deleteDataById,
   getAllDataFromTableParsed,
   insertDataToTable,
   queryByCondition,
   queryByKeyword,
+  readAndSortData,
+  sumFieldById,
   updateDataById,
 } from '../utils';
+
+export const getFoodTotalAmount = async (foodId: number) => {
+  const data = await sumFieldById(
+    db,
+    'food_stocks',
+    'food_id',
+    foodId,
+    'amount',
+  );
+  const {sum_field} = (data as any)[0];
+  return sum_field;
+};
 
 // 获取所有种类
 export const getAllCategories = async () => {
   return await getAllDataFromTableParsed(db, 'food_categories');
+};
+
+// 获取所有购物清单食物
+export const getAllShoppingListFood = async (order?: Order) => {
+  if (!order) {
+    return await getAllDataFromTableParsed(db, 'shopping_list_foods');
+  }
+  return await readAndSortData(db, 'shopping_list_foods', 'checked', order);
+};
+
+// 更新购物清单食物check
+export const checkShoppingListFood = async (id: number, checked: 0 | 1) => {
+  console.log('id checked', id, checked);
+  return await updateDataById(db, 'shopping_list_foods', id, {
+    checked,
+  });
 };
 
 // 获取种类对应的所有食物
@@ -49,6 +80,15 @@ export const getFoodItemById = async (id: number) => {
 export const getStockFoodItemById = async (id: number) => {
   const data = await queryByCondition(db, 'food_stocks', {
     id: id,
+  });
+  return data[0];
+};
+
+// 获取foodId对应的自动计划列表
+export const getAutoShoppingListFoodById = async (id: number) => {
+  const data = await queryByCondition(db, 'shopping_list_foods', {
+    food_id: id,
+    auto: 1,
   });
   return data[0];
 };

@@ -203,7 +203,7 @@ export const Setting = () => {
           size={SIZE.icon}
           onPress={() => {
             // @ts-ignore
-            navigation.navigate('Home');
+            navigation.goBack();
           }}
         />
       </View>

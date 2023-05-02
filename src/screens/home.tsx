@@ -10,6 +10,5 @@ export const Home = () => (
     <StatusBar backgroundColor={COLORS.background} translucent={false} />
     <Header />
     <Tabs />
-    {/* <AddFAB /> */}
   </>
 );

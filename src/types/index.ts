@@ -14,7 +14,7 @@ export type FoodItem = {
   normal_persist_time?: number; // 常温储存的保质期，以天数计算
   recommended_layer?: Layer; // 推荐的保鲜层，可以是：'Fresh' | 'Frozen' | 'Normal'
   food_unit?: string; // 食物的单位
-  outdate_notice_advance_time?: number; // 过期时间
+  outdate_notice_advance_time?: number; // 临期时间
   outdate_notice_frequency?: number; // 通知频率
   remarks?: string;
 };
@@ -29,8 +29,8 @@ export type StockFood = {
   layer: Layer; // 存放的位置，可以为'Fresh' | 'Frozen' | 'Normal'三者之一
   food_unit?: string; // 食物的单位
   notify_ids: string; // 通知绑定的ids
-  outdate_notice_advance_time?: string; // 过期时间
-  outdate_notice_frequency?: string; // 通知频率
+  outdate_notice_advance_time?: number; // 临期时间
+  outdate_notice_frequency?: number; // 通知频率
   start_time: number; // 开始日
   end_time: number; // 结束日
   remarks?: string; // 食物备注
@@ -41,6 +41,21 @@ export type StockFood = {
   waste_amount_after_expiry: number;
 };
 
+// 耗尽的食物列表
 export interface ExhaustedFood extends StockFood {
   exhausted_time: number; // 耗尽时间
 }
+
+// 购物清单
+export type ShopListItem = {
+  id: number;
+  food_name: string; // 食物名称
+  food_id: number; // 对应的食物id
+  category_id: number; // 对应的种类id
+  category_name: string; // 对应的种类name
+  amount: number; // 数量
+  auto: 0 | 1; // 默认0
+  auto_exp_amount?: number;
+  auto_min_amount?: number;
+  checked: 0 | 1; // 是否划掉
+};

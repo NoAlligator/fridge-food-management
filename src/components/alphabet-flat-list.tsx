@@ -1,5 +1,13 @@
-import React, {FC, useContext, useMemo, useState} from 'react';
-import {Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+/* eslint-disable react-native/no-inline-styles */
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {AlphabetList} from 'react-native-section-alphabet-list';
 import pinyin from 'pinyin';
 import {COLORS} from '../constants';
@@ -8,72 +16,44 @@ import {getAllItemsByCategoryId, getAllItemsByKeyword} from '../database/query';
 import {useAsyncEffect} from 'ahooks';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {Button} from '@rneui/themed';
-import {ItemAdd} from './item-add';
-import {LayerContext} from '../store';
+import {LayerContext, ShoppingModeContext, emitter} from '../store';
+import {useNavigation} from '@react-navigation/native';
+import {AddShoppingListModal} from './add-shopping-list';
 const Item = ({item}: {item: any}) => {
+  const navigation = useNavigation();
   const [visible, setVisible] = useState(false);
+  const shoppingListMode = useContext(ShoppingModeContext);
+  const layer = useContext(LayerContext);
   return (
     <>
-      <TouchableOpacity onPress={() => setVisible(true)}>
+      <TouchableOpacity
+        onPress={() => {
+          if (shoppingListMode) {
+            setVisible(true);
+          } else {
+            // @ts-ignore
+            navigation.navigate('EditFood', {
+              layer,
+              item,
+            });
+          }
+        }}>
         <View style={styles.listItemContainer}>
           <Text style={styles.listItemLabel}>{item.displayValue}</Text>
         </View>
       </TouchableOpacity>
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <AddShoppingListModal
         visible={visible}
-        onRequestClose={() => setVisible(false)}
-        hardwareAccelerated>
-        <View style={modalStyle.modalContainer}>
-          <View style={modalStyle.modal}>
-            <View style={modalStyle.header}>
-              <Icon
-                name="arrow-back"
-                size={25}
-                color="white"
-                onPress={() => setVisible(false)}
-              />
-            </View>
-            <ItemAdd
-              setVisible={setVisible}
-              categoryId={item.categoryId}
-              categoryName={item.categoryName}
-              itemName={item.displayValue}
-              itemId={item.key}
-              defaultLifeSpan={item.defaultLifeSpan}
-            />
-          </View>
-        </View>
-      </Modal>
+        setVisible={setVisible}
+        foodId={item.key}
+        foodName={item.displayValue}
+        categoryId={item.categoryId}
+        categoryName={item.categoryName}
+        editMode={false}
+      />
     </>
   );
 };
-
-const modalStyle = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalContainer: {
-    display: 'flex',
-    height: '100%',
-  },
-  modal: {
-    backgroundColor: '#ffffff',
-    width: '100%',
-    height: '100%',
-  },
-  header: {
-    height: 50,
-    backgroundColor: COLORS.background,
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-});
 
 const CustomAlphabetList: FC<{
   activeCategoryId: number | null;
@@ -90,12 +70,21 @@ const CustomAlphabetList: FC<{
     setItems(data as any);
   }, [inSearch]);
   useAsyncEffect(async () => {
+    await refresh();
+  }, [activeCategoryId, inSearch]);
+  const refresh = useCallback(async () => {
     if (activeCategoryId === null || inSearch) {
       return;
     }
     const data = await getAllItemsByCategoryId(activeCategoryId);
     setItems(data as any);
   }, [activeCategoryId, inSearch]);
+  useEffect(() => {
+    emitter.on('AddFood/fresh', refresh);
+    return () => {
+      emitter.off('AddFood/fresh', refresh);
+    };
+  }, [refresh]);
   const foodsToPingyin: {value: string; key: number}[] = useMemo(() => {
     return items.map(
       ({
@@ -144,6 +133,8 @@ const CustomAlphabetList: FC<{
     );
   };
 
+  const navigation = useNavigation();
+
   return (
     <>
       <View style={styles.container}>
@@ -171,6 +162,10 @@ const CustomAlphabetList: FC<{
                 height: 50,
               }}
               color={COLORS.background}
+              onPress={() => {
+                // @ts-ignore
+                navigation.navigate('Preset');
+              }}
             />
           </View>
         )}

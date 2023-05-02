@@ -22,6 +22,27 @@ const init = async () => {
   await deleteTable(db, 'food_items');
   await deleteTable(db, 'food_categories');
   await deleteTable(db, 'food_stocks');
+  await deleteTable(db, 'shopping_list_foods');
+
+  await initTable(
+    db,
+    'shopping_list_foods',
+    `
+    CREATE TABLE IF NOT EXISTS shopping_list_foods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      food_name TEXT NOT NULL,
+      food_id INTEGER NOT NULL,
+      category_id INTEGER NOT NULL,
+      category_name TEXT NOT NULL,
+      auto INTEGER DEFAULT 0 NOT NULL,
+      amount INTEGER NOT NULL,
+      auto_exp_amount INTEGER,
+      auto_min_amount INTEGER,
+      checked INTEGER DEFAULT 0 NOT NULL
+    );
+    `,
+  );
+
   await initTable(
     db,
     'exhausted_foods',
@@ -36,7 +57,7 @@ const init = async () => {
       layer TEXT NOT NULL,
       food_unit TEXT,
       notify_ids TEXT NOT NULL,
-      outdate_notice_advance_time TEXT,
+      outdate_notice_advance_time INTEGER,
       outdate_notice_frequency TEXT,
       start_time INTEGER NOT NULL,
       end_time INTEGER NOT NULL,
@@ -64,7 +85,7 @@ const init = async () => {
       layer TEXT NOT NULL,
       food_unit TEXT,
       notify_ids TEXT NOT NULL,
-      outdate_notice_advance_time TEXT,
+      outdate_notice_advance_time INTEGER,
       outdate_notice_frequency TEXT,
       start_time INTEGER NOT NULL,
       end_time INTEGER NOT NULL,

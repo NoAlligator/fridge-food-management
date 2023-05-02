@@ -5,7 +5,7 @@ export const COLORS = {
 
 export const SIZE = {
   icon: 25,
-  headerPaddingHorizontal: 10,
+  headerPaddingHorizontal: 20,
 };
 
 export const AsyncStorageKeys = {

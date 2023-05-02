@@ -11,20 +11,15 @@ import {StockFood} from '../types';
 import {Modal, StyleSheet, View} from 'react-native';
 import {Pressable} from '@react-native-material/core';
 import {Text} from '@rneui/base';
-import Icon from 'react-native-vector-icons/AntDesign';
 import Icon2 from 'react-native-vector-icons/MaterialIcons';
 import {COLORS} from '../constants';
 import {Mode} from '../screens/layer';
 import {Badge, Button} from '@rneui/themed';
 import NumericInput from 'react-native-numeric-input';
-import {getAllCategories, handleCostSingleFood} from '../database/query';
-import {
-  getAllDataFromTable,
-  getAllDataFromTableParsed,
-} from '../database/utils';
-import {db} from '../database';
+import {handleCostSingleFood} from '../database/query';
 import {RefreshContext} from '../store';
 import moment, {Duration} from 'moment';
+import {AddShoppingListModal} from './add-shopping-list';
 
 const getColor = (duration: Duration) => {
   const hasExpired = duration.asMilliseconds() < 0;
@@ -54,9 +49,25 @@ const Block: FC<{
   mode: Mode;
   selectedSet: Set<number>;
   setSelected: Dispatch<React.SetStateAction<number[]>>;
-  id: number;
+  id: number; // food_stock id
+  food_id: number; // food_item id
   duration: Duration;
-}> = ({name, amount, mode, selectedSet, setSelected, id, duration}) => {
+  categoryId: number;
+  categoryName: string;
+  autoListUpdater: (ids: number[]) => any;
+}> = ({
+  name,
+  amount,
+  mode,
+  selectedSet,
+  setSelected,
+  id,
+  food_id,
+  duration,
+  categoryId,
+  categoryName,
+  autoListUpdater,
+}) => {
   const displayMode = mode === 'display';
   const selected = selectedSet.has(id);
   const [modalVisible, setModalVisible] = useState(false);
@@ -69,6 +80,7 @@ const Block: FC<{
   const hasExpired = duration.asMilliseconds() < 0;
   const days = Math.floor(duration.asDays());
   const hours = Math.floor(duration.asHours());
+  const [shoppingModal, setShoppingModal] = useState(false);
   const cornerIcon = displayMode ? null : (
     <View
       style={{
@@ -243,8 +255,8 @@ const Block: FC<{
                   <Text style={{fontSize: 20}}>Used:</Text>
                 </View>
                 <NumericInput
-                  leftButtonBackgroundColor={COLORS.background}
-                  rightButtonBackgroundColor={COLORS.background}
+                  // leftButtonBackgroundColor={COLORS.background}
+                  // rightButtonBackgroundColor={COLORS.background}
                   editable={false}
                   value={costValue}
                   onChange={setCostValue}
@@ -264,8 +276,8 @@ const Block: FC<{
                   <Text style={{fontSize: 20}}>Wasted:</Text>
                 </View>
                 <NumericInput
-                  leftButtonBackgroundColor={COLORS.background}
-                  rightButtonBackgroundColor={COLORS.background}
+                  // leftButtonBackgroundColor={COLORS.background}
+                  // rightButtonBackgroundColor={COLORS.background}
                   editable={false}
                   value={wasteValue}
                   onChange={setWasteValue}
@@ -300,31 +312,69 @@ const Block: FC<{
                 justifyContent: 'space-evenly',
               }}>
               <Button
-                color={COLORS.background}
-                buttonStyle={{width: 100}}
+                buttonStyle={{
+                  width: 80,
+                  height: 40,
+                  borderColor: COLORS.background,
+                }}
+                titleStyle={{color: COLORS.background}}
                 onPress={() => {
                   setModalVisible(false);
                   setCostValue(0);
                   setWasteValue(0);
-                }}>
+                }}
+                type="outline">
                 Cancel
               </Button>
               <Button
                 color={COLORS.background}
-                buttonStyle={{width: 100}}
+                buttonStyle={{width: 80, height: 40}}
                 onPress={async () => {
                   setModalVisible(false);
                   setCostValue(0);
                   setWasteValue(0);
                   await handleCostSingleFood(id, costValue, wasteValue);
+                  await autoListUpdater([id]);
                   await refresh();
                 }}>
                 Save
               </Button>
             </View>
+            <Pressable
+              style={{
+                position: 'absolute',
+                right: 5,
+                top: 15,
+              }}
+              onPress={() => {
+                setModalVisible(false);
+                setShoppingModal(true);
+              }}>
+              <View
+                style={{
+                  backgroundColor: COLORS.background,
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}>
+                <Icon2 name="add-shopping-cart" size={20} color="white" />
+              </View>
+            </Pressable>
           </View>
         </View>
       </Modal>
+      <AddShoppingListModal
+        visible={shoppingModal}
+        setVisible={setShoppingModal}
+        foodName={name}
+        foodId={food_id}
+        categoryId={categoryId}
+        categoryName={categoryName}
+        editMode={false}
+      />
     </>
   );
 };
@@ -334,7 +384,7 @@ const modalStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalView: {
     margin: 20,
@@ -374,7 +424,8 @@ export const FoodList: FC<{
   selected: number[];
   setSelected: Dispatch<React.SetStateAction<number[]>>;
   mode: Mode;
-}> = ({data, selected, setSelected, mode}) => {
+  autoListUpdater: (ids: number[]) => any;
+}> = ({data, selected, setSelected, mode, autoListUpdater}) => {
   const selectedSet = useMemo(() => new Set(selected.map(v => v)), [selected]);
   const groups = useMemo(() => {
     const map = new Map();
@@ -418,23 +469,37 @@ export const FoodList: FC<{
             </View>
             <View
               style={{display: 'flex', flexDirection: 'row', flexWrap: 'wrap'}}>
-              {items.map(({name, amount, id, end_time}) => {
-                const targetDate = moment(end_time);
-                const diff = targetDate.diff(now);
-                const duration = moment.duration(diff);
-                return (
-                  <Block
-                    duration={duration}
-                    name={name}
-                    amount={amount}
-                    key={id}
-                    id={id}
-                    mode={mode}
-                    selectedSet={selectedSet}
-                    setSelected={setSelected}
-                  />
-                );
-              })}
+              {items.map(
+                ({
+                  name,
+                  amount,
+                  id,
+                  end_time,
+                  food_id,
+                  category_id,
+                  category_name: _category_name,
+                }) => {
+                  const targetDate = moment(end_time);
+                  const diff = targetDate.diff(now);
+                  const duration = moment.duration(diff);
+                  return (
+                    <Block
+                      autoListUpdater={autoListUpdater}
+                      duration={duration}
+                      name={name}
+                      amount={amount}
+                      key={id}
+                      id={id}
+                      mode={mode}
+                      selectedSet={selectedSet}
+                      setSelected={setSelected}
+                      food_id={food_id}
+                      categoryId={category_id}
+                      categoryName={_category_name}
+                    />
+                  );
+                },
+              )}
             </View>
           </View>
         );
