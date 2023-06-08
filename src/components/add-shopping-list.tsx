@@ -6,7 +6,7 @@ import {Modal, StyleSheet, Text, View} from 'react-native';
 import {CheckBox} from '@rneui/themed';
 
 import NumericInput from 'react-native-numeric-input';
-import {COLORS} from '../constants';
+import {AsyncStorageKeys, CHANNEL_ID, COLORS} from '../constants';
 import {
   insertDataToTable,
   sumFieldById,
@@ -18,6 +18,8 @@ import {getAutoShoppingListFoodById} from '../database/query';
 import {useAsyncEffect} from 'ahooks';
 import {emitter} from '../store';
 import {ShopListItem} from '../types';
+import PushNotification from 'react-native-push-notification';
+import useAsyncStorage from '../hooks/useAsyncStorage';
 export const AddShoppingListModal: FC<{
   visible: boolean;
   setVisible: Dispatch<React.SetStateAction<boolean>>;
@@ -57,6 +59,14 @@ export const AddShoppingListModal: FC<{
   useAsyncEffect(async () => {
     await refresh();
   }, []);
+  const [globalNotification] = useAsyncStorage(
+    AsyncStorageKeys.globalNotification,
+    true,
+  );
+  const [exhaustedNotification] = useAsyncStorage(
+    AsyncStorageKeys.exhaustedNotification,
+    true,
+  );
   const handlePress = async () => {
     if (checked) {
       // 自动模式
@@ -109,11 +119,15 @@ export const AddShoppingListModal: FC<{
       setChecked(false);
       setAmount(1);
       setTimeout(() => {
-        if (sum_field <= warnAmount) {
-          Toast.show({
-            type: 'error',
-            text1: 'Exhausted Notice',
-            text2: `The ${foodName} may exhausted sooner!`,
+        if (
+          sum_field <= warnAmount &&
+          globalNotification &&
+          exhaustedNotification
+        ) {
+          PushNotification.localNotification({
+            channelId: CHANNEL_ID,
+            title: 'Exhausted Notice',
+            message: `The ${foodName} may exhausted sooner!`,
           });
         }
       }, 2000);

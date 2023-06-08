@@ -17,7 +17,6 @@ const init = async () => {
   if (isFirstTime === 'YES') {
     return;
   }
-  AsyncStorage.setItem('isFirstTime', 'YES');
   await deleteTable(db, 'exhausted_foods');
   await deleteTable(db, 'food_items');
   await deleteTable(db, 'food_categories');
@@ -56,9 +55,10 @@ const init = async () => {
       category_name TEXT NOT NULL,
       layer TEXT NOT NULL,
       food_unit TEXT,
-      notify_ids TEXT NOT NULL,
-      outdate_notice_advance_time INTEGER,
-      outdate_notice_frequency TEXT,
+      notify_ids TEXT,
+      expired_notify_id TEXT,
+      outdate_notice_advance_time INTEGER NOT NULL,
+      outdate_notice_frequency INTEGER NOT NULL,
       start_time INTEGER NOT NULL,
       end_time INTEGER NOT NULL,
       remarks TEXT,
@@ -84,9 +84,10 @@ const init = async () => {
       category_name TEXT NOT NULL,
       layer TEXT NOT NULL,
       food_unit TEXT,
-      notify_ids TEXT NOT NULL,
-      outdate_notice_advance_time INTEGER,
-      outdate_notice_frequency TEXT,
+      notify_ids TEXT,
+      expired_notify_id TEXT,
+      outdate_notice_advance_time INTEGER NOT NULL,
+      outdate_notice_frequency INTEGER NOT NULL,
       start_time INTEGER NOT NULL,
       end_time INTEGER NOT NULL,
       remarks TEXT,
@@ -95,16 +96,6 @@ const init = async () => {
       used_amount_after_expiry INTEGER DEFAULT 0 NOT NULL,
       waste_amount_before_expiry INTEGER DEFAULT 0 NOT NULL,
       waste_amount_after_expiry INTEGER DEFAULT 0 NOT NULL
-    );
-    `,
-  );
-  await initTable(
-    db,
-    'food_categories',
-    `
-    CREATE TABLE IF NOT EXISTS food_categories (
-      id INTEGER PRIMARY KEY,
-      name TEXT NOT NULL
     );
     `,
   );
@@ -125,6 +116,16 @@ const init = async () => {
       outdate_notice_advance_time INTEGER,
       outdate_notice_frequency INTEGER,
       remarks TEXT
+    );
+    `,
+  );
+  await initTable(
+    db,
+    'food_categories',
+    `
+    CREATE TABLE IF NOT EXISTS food_categories (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL
     );
     `,
   );
@@ -150,5 +151,6 @@ const init = async () => {
   );
   await insertDataToTable(db, 'food_categories', presetCategories);
   await insertDataToTable(db, 'food_items', presetItems);
+  AsyncStorage.setItem('isFirstTime', 'YES');
 };
 init();

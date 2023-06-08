@@ -293,6 +293,42 @@ export const deleteDataByIds = (
   });
 };
 
+// 删除购物清单里对应的食物
+export function deleteShoppingListItem(db: SQLiteDatabase, food_id: number) {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'DELETE FROM shopping_list_foods WHERE food_id = ?;',
+        [food_id],
+        (tx, resultSet) => {
+          resolve(resultSet);
+        },
+        (tx, error) => {
+          reject(error);
+        },
+      );
+    });
+  });
+}
+
+// 删除库存中对应的食物
+export function deleteStockedFood(db: SQLiteDatabase, food_id: number) {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'DELETE FROM food_stocks WHERE food_id = ?;',
+        [food_id],
+        (tx, resultSet) => {
+          resolve(resultSet);
+        },
+        (tx, error) => {
+          reject(error);
+        },
+      );
+    });
+  });
+}
+
 // 根据ID删除数据
 export function deleteDataById(
   db: SQLiteDatabase,

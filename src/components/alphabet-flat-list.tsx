@@ -19,6 +19,7 @@ import {Button} from '@rneui/themed';
 import {LayerContext, ShoppingModeContext, emitter} from '../store';
 import {useNavigation} from '@react-navigation/native';
 import {AddShoppingListModal} from './add-shopping-list';
+
 const Item = ({item}: {item: any}) => {
   const navigation = useNavigation();
   const [visible, setVisible] = useState(false);

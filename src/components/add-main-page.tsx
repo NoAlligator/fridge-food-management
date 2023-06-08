@@ -1,13 +1,10 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, {Dispatch, FC, useContext, useRef, useState} from 'react';
-import {SearchBar, SpeedDial} from '@rneui/themed';
+import React, {Dispatch, FC} from 'react';
+import {SpeedDial} from '@rneui/themed';
 import {COLORS} from '../constants';
-import {Modal, StyleSheet, View} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import {AddFood} from './food-category-list';
 import {Mode} from '../screens/layer';
 import {useNavigation} from '@react-navigation/native';
-import {LayerContext} from '../store';
 import {Layer} from '../types';
 export const AddFAB: FC<{
   mode: Mode;
@@ -37,6 +34,7 @@ export const AddFAB: FC<{
             navigation.navigate('AddFood', {
               layer,
             });
+            setOpen(!open);
           }}
         />
         {showEdit ? (
@@ -47,6 +45,7 @@ export const AddFAB: FC<{
             onPress={() => {
               setOpen(false);
               setMode('delete');
+              setOpen(!open);
             }}
           />
         ) : (
@@ -60,6 +59,7 @@ export const AddFAB: FC<{
             onPress={() => {
               setOpen(false);
               setMode('discard');
+              setOpen(!open);
             }}
           />
         ) : (
@@ -73,6 +73,7 @@ export const AddFAB: FC<{
             onPress={() => {
               setOpen(false);
               setMode('exhausted');
+              setOpen(!open);
             }}
           />
         ) : (

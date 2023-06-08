@@ -52,9 +52,7 @@ export const MultiEditFoodScreen = ({route}: {route: any}) => {
                   multiplyData={{
                     amount: item.amount,
                     addedCallback: async (inStockNumber: number) => {
-                      console.log(item);
                       if (item.auto === 1) {
-                        // 注意，入库是更新不是删除！！！
                         await updateDataById(
                           db,
                           'shopping_list_foods',

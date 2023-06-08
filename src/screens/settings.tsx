@@ -7,6 +7,19 @@ import useAsyncStorage from '../hooks/useAsyncStorage';
 import {useNavigation} from '@react-navigation/native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import NumericInput from 'react-native-numeric-input';
+import {getAllFoodStocked} from '../database/query';
+import PushNotification from 'react-native-push-notification';
+import {
+  closeAllAdventReminder,
+  closeAllExpiredReminder,
+  closeAllNotifications,
+  reopenAdventReminder,
+  reopenAllExpiredReminder,
+  reopenAllNotifications,
+  subscribeNotification,
+} from '../utils/subscribe-notification';
+import {updateDataById} from '../database/utils';
+import {db} from '../database';
 const style = StyleSheet.create({
   headerContainer: {
     height: 50,
@@ -119,11 +132,7 @@ function RNEListItemAccordion() {
       <ListItem.Accordion
         content={
           <ListItem.Content>
-            <ListItem.Title>Expiration Notification</ListItem.Title>
-            <ListItem.Subtitle>
-              Set the time and frequency of the default expiration notification,
-              which you can change individually for a particular food
-            </ListItem.Subtitle>
+            <ListItem.Title>Food Advent Reminder</ListItem.Title>
           </ListItem.Content>
         }
         isExpanded={expanded}
@@ -132,8 +141,15 @@ function RNEListItemAccordion() {
         }}>
         <View>
           <SwitchList
-            title="Expiration Notification Switch"
+            title="Food Advent Reminder Switch"
             asyncKey={AsyncStorageKeys.expiredNotification}
+            onChangeCallback={async v => {
+              if (!v) {
+                await closeAllAdventReminder();
+              } else {
+                await reopenAdventReminder();
+              }
+            }}
           />
         </View>
         <View style={{zIndex: 200}}>
@@ -171,11 +187,12 @@ function RNEListItemAccordion() {
   );
 }
 
-const SwitchList: FC<{title: string; subTitle?: string; asyncKey: string}> = ({
-  title,
-  subTitle,
-  asyncKey,
-}) => {
+const SwitchList: FC<{
+  title: string;
+  subTitle?: string;
+  asyncKey: string;
+  onChangeCallback?: (v: boolean) => any;
+}> = ({title, subTitle, asyncKey, onChangeCallback}) => {
   const [value, setValue] = useAsyncStorage(asyncKey ?? '', true);
   return (
     <ListItem>
@@ -186,7 +203,11 @@ const SwitchList: FC<{title: string; subTitle?: string; asyncKey: string}> = ({
       <Switch
         color={COLORS.background}
         value={value}
-        onChange={e => setValue(e.nativeEvent.value)}
+        onChange={async e => {
+          const v = e.nativeEvent.value;
+          setValue(v);
+          onChangeCallback?.(v);
+        }}
       />
     </ListItem>
   );
@@ -212,6 +233,13 @@ export const Setting = () => {
           <SwitchList
             title="Global Notification Switch"
             asyncKey={AsyncStorageKeys.globalNotification}
+            onChangeCallback={async v => {
+              if (!v) {
+                await closeAllNotifications();
+              } else {
+                await reopenAllNotifications();
+              }
+            }}
           />
           <Divider />
           <RNEListItemAccordion />
@@ -220,6 +248,13 @@ export const Setting = () => {
             title="Expired Reminder"
             subTitle="Whether to remind you after the food expired"
             asyncKey={AsyncStorageKeys.expiredNotification}
+            onChangeCallback={async v => {
+              if (!v) {
+                await closeAllExpiredReminder();
+              } else {
+                await reopenAllExpiredReminder();
+              }
+            }}
           />
           <Divider />
           <SwitchList

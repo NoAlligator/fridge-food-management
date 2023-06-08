@@ -16,35 +16,53 @@ import {COLORS} from '../constants';
 import {Mode} from '../screens/layer';
 import {Badge, Button} from '@rneui/themed';
 import NumericInput from 'react-native-numeric-input';
-import {handleCostSingleFood} from '../database/query';
-import {RefreshContext} from '../store';
+import {getFoodItemById, handleCostSingleFood} from '../database/query';
+import {
+  FilterContext,
+  RefreshContext,
+  SearchContext,
+  SortContext,
+  SortType,
+} from '../store';
 import moment, {Duration} from 'moment';
 import {AddShoppingListModal} from './add-shopping-list';
+import {useAsyncEffect} from 'ahooks';
 
-const getColor = (duration: Duration) => {
+enum Status {
+  EXPIRED,
+  NORMAL,
+  NEAR_EXPIRED,
+}
+
+const getStatus = (duration: Duration, outdate_notice_advance_time: number) => {
+  const nearExpired =
+    duration.asMilliseconds() <= outdate_notice_advance_time * 86400000;
   const hasExpired = duration.asMilliseconds() < 0;
-  const days = Math.floor(duration.asDays());
-  const hours = Math.floor(duration.asHours());
+  if (hasExpired) {
+    return Status.EXPIRED;
+  }
+  if (nearExpired) {
+    return Status.NEAR_EXPIRED;
+  }
+  return Status.NORMAL;
+};
+
+const getColor = (duration: Duration, outdate_notice_advance_time: number) => {
+  const nearExpired =
+    duration.asMilliseconds() <= outdate_notice_advance_time * 86400000;
+  const hasExpired = duration.asMilliseconds() < 0;
   if (hasExpired) {
     return 'grey';
-  } else {
-    if (days >= 7) {
-      return 'rgb(82, 196, 26)';
-    }
-    if (days > 1) {
-      return 'rgb(32, 137, 220)';
-    }
-    if (hours > 1) {
-      return 'rgb(250, 173, 20)';
-    }
-    if (hours < 1) {
-      return 'rgb(255, 25, 12)';
-    }
   }
+  if (nearExpired) {
+    return 'rgb(255, 25, 12)';
+  }
+  return 'rgb(82, 196, 26)';
 };
 
 const Block: FC<{
   name: string;
+  food_unit: string | undefined;
   amount: number;
   mode: Mode;
   selectedSet: Set<number>;
@@ -55,6 +73,7 @@ const Block: FC<{
   categoryId: number;
   categoryName: string;
   autoListUpdater: (ids: number[]) => any;
+  outdate_notice_advance_time: number;
 }> = ({
   name,
   amount,
@@ -67,6 +86,8 @@ const Block: FC<{
   categoryId,
   categoryName,
   autoListUpdater,
+  outdate_notice_advance_time,
+  food_unit,
 }) => {
   const displayMode = mode === 'display';
   const selected = selectedSet.has(id);
@@ -81,6 +102,15 @@ const Block: FC<{
   const days = Math.floor(duration.asDays());
   const hours = Math.floor(duration.asHours());
   const [shoppingModal, setShoppingModal] = useState(false);
+  const [unit, setUnit] = useState(food_unit);
+  useAsyncEffect(async () => {
+    if (!unit) {
+      const ret = await getFoodItemById(food_id);
+      if (ret && ret?.food_unit) {
+        setUnit(ret?.food_unit);
+      }
+    }
+  });
   const cornerIcon = displayMode ? null : (
     <View
       style={{
@@ -116,7 +146,10 @@ const Block: FC<{
       )}
     </View>
   );
-  const color = useMemo(() => getColor(duration), [duration]);
+  const color = useMemo(
+    () => getColor(duration, outdate_notice_advance_time),
+    [duration, outdate_notice_advance_time],
+  );
   const expiredIcon = (
     <Badge
       badgeStyle={{backgroundColor: color, borderWidth: 0}}
@@ -191,17 +224,10 @@ const Block: FC<{
               justifyContent: 'space-around',
               alignItems: 'center',
             }}>
-            {/* {displayMode && (
-              <View>
-                <Icon name="minuscircle" size={15} color={COLORS.background} />
-              </View>
-            )} */}
-            <Text>{amount}</Text>
-            {/* {displayMode && (
-              <View>
-                <Icon name="pluscircle" size={15} color={COLORS.background} />
-              </View>
-            )} */}
+            <Text>
+              {amount}
+              {unit ? unit : ''}
+            </Text>
           </View>
         </Pressable>
         {cornerIcon}
@@ -426,11 +452,40 @@ export const FoodList: FC<{
   mode: Mode;
   autoListUpdater: (ids: number[]) => any;
 }> = ({data, selected, setSelected, mode, autoListUpdater}) => {
+  const [{grouping, expired, nearExpired, normal}] = useContext(FilterContext);
   const selectedSet = useMemo(() => new Set(selected.map(v => v)), [selected]);
+  const [search] = useContext(SearchContext);
   const groups = useMemo(() => {
     const map = new Map();
+    if (!grouping) {
+      map.set('no-category', data);
+      return [...map.entries()];
+    }
     data.forEach(item => {
-      const {category_name} = item;
+      const {
+        category_name,
+        start_time,
+        end_time,
+        outdate_notice_advance_time,
+        name,
+      } = item;
+      if (search !== '') {
+        const ret = name.match(new RegExp(search, 'i'));
+        if (ret === null) {
+          return;
+        }
+      }
+      const targetDate = moment(end_time);
+      const diff = targetDate.diff(start_time);
+      const duration = moment.duration(diff);
+      const status = getStatus(duration, outdate_notice_advance_time);
+      const shouldSkip =
+        (status === Status.EXPIRED && !expired) ||
+        (status === Status.NEAR_EXPIRED && !nearExpired) ||
+        (status === Status.NORMAL && !normal);
+      if (shouldSkip) {
+        return;
+      }
       if (!map.has(category_name)) {
         map.set(category_name, [item]);
       } else {
@@ -439,13 +494,14 @@ export const FoodList: FC<{
       }
     });
     return [...map.entries()];
-  }, [data]);
+  }, [data, expired, grouping, normal, nearExpired, search]);
   const [now, setNow] = useState(() => moment());
   useEffect(() => {
     setTimeout(() => {
       setNow(moment());
     }, 60000);
   }, [now]);
+  const [sort] = useContext(SortContext);
   return (
     <View>
       {groups.map(([category_name, items]: [string, StockFood[]]) => {
@@ -453,53 +509,84 @@ export const FoodList: FC<{
           <View
             style={{flex: 1, marginTop: 20, marginBottom: 10}}
             key={category_name}>
+            {grouping && (
+              <View
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}>
+                <Text
+                  style={{
+                    marginLeft: 5,
+                  }}>{`${category_name}(${items.length})`}</Text>
+                <View style={{flex: 1, paddingLeft: 15, paddingRight: 10}}>
+                  <DashedLine />
+                </View>
+              </View>
+            )}
             <View
               style={{
                 display: 'flex',
                 flexDirection: 'row',
-                alignItems: 'center',
+                flexWrap: 'wrap',
               }}>
-              <Text
-                style={{
-                  marginLeft: 5,
-                }}>{`${category_name}(${items.length})`}</Text>
-              <View style={{flex: 1, paddingLeft: 15, paddingRight: 10}}>
-                <DashedLine />
-              </View>
-            </View>
-            <View
-              style={{display: 'flex', flexDirection: 'row', flexWrap: 'wrap'}}>
-              {items.map(
-                ({
-                  name,
-                  amount,
-                  id,
-                  end_time,
-                  food_id,
-                  category_id,
-                  category_name: _category_name,
-                }) => {
-                  const targetDate = moment(end_time);
-                  const diff = targetDate.diff(now);
-                  const duration = moment.duration(diff);
-                  return (
-                    <Block
-                      autoListUpdater={autoListUpdater}
-                      duration={duration}
-                      name={name}
-                      amount={amount}
-                      key={id}
-                      id={id}
-                      mode={mode}
-                      selectedSet={selectedSet}
-                      setSelected={setSelected}
-                      food_id={food_id}
-                      categoryId={category_id}
-                      categoryName={_category_name}
-                    />
-                  );
-                },
-              )}
+              {items
+                .sort((a, b) => {
+                  if (sort === SortType.NAME) {
+                    return a.name.localeCompare(b.name);
+                  }
+                  if (sort === SortType.START_TIME) {
+                    return a.start_time - b.start_time;
+                  }
+                  if (sort === SortType.EXPIRED_TIME) {
+                    return a.end_time - b.end_time;
+                  }
+                  if (sort === SortType.REST_TIME) {
+                    return (
+                      a.end_time - a.start_time - (b.end_time - b.start_time)
+                    );
+                  }
+                  return 0;
+                })
+                .map(
+                  ({
+                    name,
+                    amount,
+                    id,
+                    end_time,
+                    food_id,
+                    category_id,
+                    category_name: _category_name,
+                    outdate_notice_advance_time,
+                    start_time,
+                    food_unit,
+                  }) => {
+                    const targetDate = moment(end_time);
+                    const diff = targetDate.diff(start_time);
+                    const duration = moment.duration(diff);
+                    return (
+                      <Block
+                        autoListUpdater={autoListUpdater}
+                        duration={duration}
+                        name={name}
+                        amount={amount}
+                        key={id}
+                        id={id}
+                        mode={mode}
+                        selectedSet={selectedSet}
+                        setSelected={setSelected}
+                        food_id={food_id}
+                        categoryId={category_id}
+                        categoryName={_category_name}
+                        outdate_notice_advance_time={
+                          outdate_notice_advance_time
+                        }
+                        food_unit={food_unit}
+                      />
+                    );
+                  },
+                )}
             </View>
           </View>
         );

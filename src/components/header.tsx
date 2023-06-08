@@ -1,9 +1,14 @@
-import React from 'react';
-import {View, Image, StyleSheet, Text, TouchableOpacity} from 'react-native';
+/* eslint-disable react-native/no-inline-styles */
+import React, {useContext, useState} from 'react';
+import {View, Image, StyleSheet} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {COLORS} from '../constants';
-import {Divider, Tooltip} from '@rneui/themed';
+import {Divider} from '@rneui/themed';
 import {useNavigation} from '@react-navigation/native';
+import {FilterModal} from './filter-modal';
+import {SortModal} from './sort-modal';
+import {SearchModal} from './search-modal';
+import {SearchContext} from '../store';
 
 const headerStyle = StyleSheet.create({
   container: {
@@ -30,13 +35,17 @@ const headerStyle = StyleSheet.create({
     marginRight: 10,
   },
   iconStyle: {
-    marginHorizontal: 4,
+    marginLeft: 5,
+    marginRight: 5,
   },
 });
 
 export const Header = () => {
   const navigation = useNavigation();
-  const [open, setOpen] = React.useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [search] = useContext(SearchContext);
   return (
     <>
       <View style={headerStyle.container}>
@@ -47,7 +56,7 @@ export const Header = () => {
         <View style={headerStyle.iconsContainer}>
           <Icon
             name="shopping-cart"
-            size={25}
+            size={20}
             color="white"
             style={headerStyle.iconStyle}
             onPress={() => {
@@ -57,7 +66,7 @@ export const Header = () => {
           />
           <Icon
             name="bar-chart"
-            size={25}
+            size={20}
             color="white"
             style={headerStyle.iconStyle}
             onPress={() => {
@@ -71,69 +80,64 @@ export const Header = () => {
           />
           <Icon
             name="search"
-            size={25}
-            color="white"
+            size={20}
+            color={search !== '' ? 'black' : 'white'}
             style={headerStyle.iconStyle}
+            onPress={() => {
+              setSearchModalVisible(true);
+            }}
           />
           <Icon
             name="filter-alt"
-            size={25}
+            size={20}
             color="white"
             style={headerStyle.iconStyle}
+            onPress={() => {
+              setModalVisible(true);
+            }}
+          />
+          <Icon
+            name="sort"
+            size={20}
+            color="white"
+            style={headerStyle.iconStyle}
+            onPress={() => {
+              setSortModalVisible(true);
+            }}
           />
           <Divider
             orientation="vertical"
             style={{marginVertical: 4, marginHorizontal: 5}}
           />
-          <Tooltip
-            visible={open}
-            onOpen={() => {
-              setOpen(true);
+          <Icon
+            name="settings"
+            size={20}
+            color="white"
+            style={[
+              headerStyle.iconStyle,
+              {
+                marginRight: 10,
+              },
+            ]}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('Setting');
             }}
-            onClose={() => {
-              setOpen(false);
-            }}
-            width={100}
-            height={80}
-            backgroundColor="white"
-            skipAndroidStatusBar={true}
-            containerStyle={{
-              elevation: 5,
-              shadowColor: '#000',
-              shadowOffset: {width: 0, height: 2},
-              shadowOpacity: 0.3,
-              shadowRadius: 2,
-            }}
-            popover={
-              <View style={headerStyle.popOverContainer}>
-                <TouchableOpacity onPress={() => {}}>
-                  <View style={headerStyle.moreOption}>
-                    <Text style={{color: 'black'}}>Sort & Filter</Text>
-                  </View>
-                </TouchableOpacity>
-                <Divider />
-                <TouchableOpacity
-                  onPress={() => {
-                    setOpen(false);
-                    // @ts-ignore
-                    navigation.navigate('Setting');
-                  }}>
-                  <View style={headerStyle.moreOption}>
-                    <Text style={{color: 'black'}}>Setting</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            }
-            withPointer={false}>
-            <Icon
-              name="more-vert"
-              size={25}
-              color="white"
-              style={headerStyle.iconStyle}
-            />
-          </Tooltip>
+          />
         </View>
       </View>
+      <FilterModal
+        modalVisible={modalVisible}
+        setModalVisible={setModalVisible}
+      />
+      <SortModal
+        modalVisible={sortModalVisible}
+        setModalVisible={setSortModalVisible}
+      />
+      <SearchModal
+        modalVisible={searchModalVisible}
+        setModalVisible={setSearchModalVisible}
+      />
     </>
   );
 };

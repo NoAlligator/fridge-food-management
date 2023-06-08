@@ -99,31 +99,29 @@ export const PresetPage: FC<{
   useEffect(() => {
     if (!createNew && foodItemInDatabase) {
       if (layer !== 'Fresh' && typeof _fresh_persist_time === 'number') {
-        console.log(
-          'setLifeSpanFresh(_fresh_persist_time);',
-          _fresh_persist_time,
-        );
         setLifeSpanFresh(_fresh_persist_time);
       }
       if (layer !== 'Frozen' && typeof _frozen_persist_time === 'number') {
-        console.log(
-          'setLifeSpanFreezer(_frozen_persist_time);',
-          _frozen_persist_time,
-        );
         setLifeSpanFreezer(_frozen_persist_time);
       }
       if (layer !== 'Normal' && typeof _normal_persist_time === 'number') {
-        console.log(
-          'setLifeSpanPantry(_normal_persist_time);',
-          _normal_persist_time,
-        );
         setLifeSpanPantry(_normal_persist_time);
       }
       if (!unit && _food_unit) {
         setUnit(_food_unit);
       }
     }
-  }, [foodItemInDatabase]);
+  }, [
+    _food_unit,
+    _fresh_persist_time,
+    _frozen_persist_time,
+    _normal_persist_time,
+    createNew,
+    foodItemInDatabase,
+    layer,
+    setUnit,
+    unit,
+  ]);
   const handlePress = async () => {
     const data = {
       name: foodName,

@@ -16,8 +16,6 @@ import {FAB} from '@rneui/themed';
 import {db} from '../database';
 import {
   deleteDataByIds,
-  getAllDataFromTable,
-  getAllDataFromTableParsed,
   queryByCondition,
   updateDataById,
 } from '../database/utils';
@@ -46,18 +44,6 @@ export const LayerScreen: FC<{layer: Layer}> = ({layer}) => {
   }, [refresh]);
   const [mode, setMode] = useState<Mode>('display');
   const [selected, setSelected] = useState<number[]>([]);
-  useAsyncEffect(async () => {
-    const data = await getAllDataFromTableParsed(db, 'shopping_list_foods');
-    const _data = await queryByCondition(db, 'shopping_list_foods', {
-      food_id: 63,
-      auto: 1,
-    });
-    console.log('_data', _data);
-    // console.log(
-    //   "await getAllDataFromTableParsed(db, 'shopping_list_foods')",
-    //   data,
-    // );
-  }, []);
 
   // 必须在操作数据库之后执行
   const autoListUpdater = useCallback(
@@ -104,20 +90,20 @@ export const LayerScreen: FC<{layer: Layer}> = ({layer}) => {
   };
   const exhaustedSelected = async () => {
     setMode('display');
-    setSelected([]);
     await Promise.all(
       selected.map(id => handleTerminateSingleFood(id, TerminateType.USED)),
     );
+    setSelected([]);
     await autoListUpdater(selected);
     await refresh();
   };
 
   const wastedSelected = async () => {
     setMode('display');
-    setSelected([]);
     await Promise.all(
       selected.map(id => handleTerminateSingleFood(id, TerminateType.WASTED)),
     );
+    setSelected([]);
     await autoListUpdater(selected);
     await refresh();
   };

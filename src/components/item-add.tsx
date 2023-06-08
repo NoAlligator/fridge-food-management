@@ -30,6 +30,10 @@ import {db} from '../database';
 import {useNavigation} from '@react-navigation/native';
 import {getExpirationStatus} from '../utils';
 import {Picker} from '@react-native-picker/picker';
+import {
+  subscribeExpiredNotification,
+  subscribeNotification,
+} from '../utils/subscribe-notification';
 
 export const ItemAdd: FC<{
   categoryId: number;
@@ -95,18 +99,10 @@ export const ItemAdd: FC<{
     setLifeSpan(duration);
     setTimeRange([startTime, date]);
   };
-
   const changeStartDate = (date: Date) => {
     const duration = Math.floor(
       moment.duration(endTime.getTime() - date.getTime()).asDays(),
     );
-    const startMoment = moment(startTime);
-    const endMoment = moment(date).set({
-      hour: startMoment.hour(),
-      minute: startMoment.minute(),
-      second: startMoment.second(),
-      millisecond: startMoment.millisecond(),
-    });
     if (duration <= 0) {
       return Alert.alert(
         'Failed to set Start Date',
@@ -114,7 +110,7 @@ export const ItemAdd: FC<{
       );
     }
     setLifeSpan(duration);
-    setTimeRange([date, endMoment.toDate()]);
+    setTimeRange([date, endTime]);
   };
 
   // Unit
@@ -144,68 +140,52 @@ export const ItemAdd: FC<{
     amount: num,
   };
   const [loading, setLoading] = useState(false);
+  const [globalNotification] = useAsyncStorage(
+    AsyncStorageKeys.globalNotification,
+    true,
+  );
+  const [expirationNotification] = useAsyncStorage(
+    AsyncStorageKeys.expirationNotification,
+    true,
+  );
+  const [expiredNotification] = useAsyncStorage(
+    AsyncStorageKeys.expiredNotification,
+    true,
+  );
 
   const handlePress = async () => {
     setLoading(true);
-    let firstNotificationTime = moment(endTime).subtract(
-      Number(entValue),
-      'days',
-    );
-    if (
-      firstNotificationTime.isBefore(moment(startTime).local().startOf('day'))
-    ) {
-      // 如果减去提前提醒是时间是入库时间之前，手动将初次提醒时间置为入库时间
-      firstNotificationTime = moment(startTime);
+    let dataToStore = ret;
+    if (globalNotification && expirationNotification) {
+      const ids = subscribeNotification(
+        startTime,
+        endTime,
+        entValue,
+        freqValue,
+        itemName,
+      );
+      const idsStr = JSON.stringify(ids);
+      dataToStore = {
+        ...ret,
+        notify_ids: idsStr,
+      };
     }
-    const notificationTimes: Moment[] = []; // 需要通知的时间
-    let nextNotificationTime = firstNotificationTime.clone();
-    while (nextNotificationTime.isBefore(endTime)) {
-      notificationTimes.push(nextNotificationTime);
-      nextNotificationTime = nextNotificationTime
-        .clone()
-        .add(Number(freqValue), 'hours');
+    if (expiredNotification) {
+      const id = subscribeExpiredNotification(endTime, itemName);
+      dataToStore = {
+        ...ret,
+        expired_notify_id: id,
+      };
     }
-    const generateUniqueId = () => {
-      const uniqueId = Math.floor(Math.random() * 2 ** 32).toString();
-      return uniqueId;
-    };
-
-    const ids = notificationTimes.map(() => generateUniqueId());
-    const idsStr = JSON.stringify(ids);
-    const dataToStore: Partial<StockFood> = {
-      ...ret,
-      notify_ids: idsStr,
-    };
-    try {
-      await insertDataToTable(db, 'food_stocks', dataToStore as any);
+    await insertDataToTable(db, 'food_stocks', dataToStore as any);
+    // @ts-ignore
+    emitter.emit('Home/refresh');
+    if (!multiplyMode) {
       // @ts-ignore
-      emitter.emit('Home/refresh');
-      if (!multiplyMode) {
-        // @ts-ignore
-        navigation.navigate('Home');
-      }
-      notificationTimes.forEach((date, index) => {
-        const duration = moment.duration(moment(endTime).diff(date));
-        const days = Math.floor(duration.asDays());
-        const hours = Math.floor(duration.asHours());
-        const display =
-          days === 0
-            ? `will expire in ${hours} hours`
-            : `will expire in ${days} days`;
-        PushNotification.localNotificationSchedule({
-          channelId: CHANNEL_ID,
-          id: ids[index],
-          title: 'Food Expiration Reminder',
-          message: `Note that your ${itemName} ${display}. Please eat it as soon as possible to avoid wasting it`,
-          date: date.toDate(),
-          allowWhileIdle: false,
-        });
-      });
-      if (multiplyMode) {
-        await multiplyData?.addedCallback(num);
-      }
-    } catch (e) {
-      console.log(e);
+      navigation.navigate('Home');
+    }
+    if (multiplyMode) {
+      await multiplyData?.addedCallback(num);
     }
   };
   const ENT = useMemo(
@@ -465,6 +445,7 @@ export const ItemAdd: FC<{
                   },
                   lifeSpan,
                 });
+                emitter.emit('Home/refresh');
               }}>
               Save As Preset
             </Button>

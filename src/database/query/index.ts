@@ -30,6 +30,11 @@ export const getAllCategories = async () => {
   return await getAllDataFromTableParsed(db, 'food_categories');
 };
 
+// 获取所有库存食物
+export const getAllFoodStocked = async () => {
+  return await getAllDataFromTableParsed(db, 'food_stocks');
+};
+
 // 获取所有购物清单食物
 export const getAllShoppingListFood = async (order?: Order) => {
   if (!order) {
@@ -40,7 +45,6 @@ export const getAllShoppingListFood = async (order?: Order) => {
 
 // 更新购物清单食物check
 export const checkShoppingListFood = async (id: number, checked: 0 | 1) => {
-  console.log('id checked', id, checked);
   return await updateDataById(db, 'shopping_list_foods', id, {
     checked,
   });
@@ -51,7 +55,6 @@ export const getAllItemsByCategoryId = async (categoryId: number) => {
   const data = await queryByCondition(db, 'food_items', {
     category_id: categoryId,
   });
-  console.log(categoryId, data);
   return data;
 };
 
@@ -106,21 +109,6 @@ export enum UseType {
   WASTE,
 }
 
-// const getField = (type: UseType, haveExpired: boolean) => {
-//   if (haveExpired && type === UseType.USED) {
-//     return 'used_amount_after_expiry';
-//   }
-//   if (haveExpired && type === UseType.WASTE) {
-//     return 'waste_amount_after_expiry';
-//   }
-//   if (!haveExpired && type === UseType.USED) {
-//     return 'used_amount_before_expiry';
-//   }
-//   if (!haveExpired && type === UseType.WASTE) {
-//     return 'waste_amount_before_expiry';
-//   }
-// };
-
 export enum TerminateType {
   USED,
   WASTED,
@@ -131,7 +119,6 @@ export const handleTerminateSingleFood = async (
   type: TerminateType,
 ) => {
   const food = await getStockFoodItemById(id);
-  console.log(id, food);
   const {amount} = food;
   if (type === TerminateType.USED) {
     return handleCostSingleFood(id, amount, 0);
@@ -159,7 +146,6 @@ export const handleCostSingleFood = async (
   } = food as StockFood;
   const haveExpired = +new Date() > end_time;
   const retAmount = amount - cost - waste;
-  console.log('food', food);
   const ret: any = {
     amount: retAmount, // 剩余结果
   };
@@ -192,4 +178,16 @@ export const handleAddSingleFood = async (id: number, num: number) => {
     amount: amount + num,
   };
   await updateDataById(db, 'food_stocks', stockFoodId, ret);
+};
+
+export const queryShoppingList = async (food_id: number) => {
+  return await queryByCondition(db, 'shopping_list_foods', {
+    food_id,
+  });
+};
+
+export const queryFoodStock = async (food_id: number) => {
+  return await queryByCondition(db, 'food_stocks', {
+    food_id,
+  });
 };
